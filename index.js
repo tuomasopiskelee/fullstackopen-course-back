@@ -7,6 +7,8 @@ app.use(cors());
 
 app.use(express.json());
 
+app.use(express.static('dist'))
+
 morgan.token("req-headers", function (req, res) {
   return JSON.stringify(req.headers);
 });
