@@ -1,54 +1,55 @@
 const express = require("express");
 const morgan = require("morgan");
 const app = express();
-const cors = require('cors')
+const cors = require("cors");
+const mongoose = require("mongoose");
 
 app.use(cors());
 
 app.use(express.json());
 
-app.use(express.static('dist'))
+app.use(express.static("dist"));
 
 morgan.token("req-headers", function (req, res) {
   return JSON.stringify(req.headers);
 });
 //app.use(morgan(":method :url :status :req-headers"));
 
-let notes = [
-  {
-    id: 1,
-    content: "HTML is easy as it is",
-    important: true,
-  },
-  {
-    id: 2,
-    content: "Browser can execute only proper JavaScript",
-    important: false,
-  },
-  {
-    id: 3,
-    content:
-      "GET and POST are currently most important methods of HTTP protocol",
-    important: true,
-  },
-];
+function getConnectionString(collection) {
+  let url = `mongodb+srv://fullstack:munfullstack@cluster0.azl3hya.mongodb.net/${collection}?retryWrites=true&w=majority`;
+  console.log(url);
+  return url;
+}
 
-let phoneInfos = [
-  { id: "1", name: "person A", phone: "123123" },
-  { id: "2", name: "person B", phone: "454545" },
-  { id: "3", name: "person C", phone: "878778" },
-];
+const notesSchema = new mongoose.Schema({
+  content: String,
+  boolean: Boolean,
+});
+const notesDBConnection = mongoose.createConnection(getConnectionString("noteApp"));
+const Notes = notesDBConnection.model("Notes", notesSchema);
+
+const phoneSchema = new mongoose.Schema({
+  name: String,
+  phone: String,
+});
+const phoneDBDonnection = mongoose.createConnection(getConnectionString("phoneApp"));
+const PhoneInfo = phoneDBDonnection.model("PhoneInfo", phoneSchema);
 
 app.get("/", (req, res) => {
   res.send("<h1>Hello World again and again!</h1>");
 });
 
 app.get("/api/notes", (req, res) => {
-  res.json(notes);
+  Notes.find({}).then((result) => {
+    res.json(result);
+  });
 });
 
 app.get("/api/persons", (req, res) => {
-  res.json(phoneInfos);
+  PhoneInfo.find({}).then((result) => {
+    res.json(result);
+    mongoose.connection.close();
+  });
 });
 
 app.get("/api/persons/:id", (req, res) => {
