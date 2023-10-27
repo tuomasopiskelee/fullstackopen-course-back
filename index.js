@@ -3,6 +3,7 @@ const morgan = require("morgan");
 const app = express();
 const cors = require("cors");
 const mongoose = require("mongoose");
+require('dotenv').config();
 
 app.use(cors());
 
@@ -16,7 +17,8 @@ morgan.token("req-headers", function (req, res) {
 //app.use(morgan(":method :url :status :req-headers"));
 
 function getConnectionString(collection) {
-  let url = `mongodb+srv://fullstack:munfullstack@cluster0.azl3hya.mongodb.net/${collection}?retryWrites=true&w=majority`;
+  const password = process.env.DB_PASSWORD;
+  let url = `mongodb+srv://fullstack:${password}@cluster0.azl3hya.mongodb.net/${collection}?retryWrites=true&w=majority`;
   console.log(url);
   return url;
 }
@@ -123,7 +125,7 @@ app.post("/api/notes", (request, response) => {
   response.json(note);
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
