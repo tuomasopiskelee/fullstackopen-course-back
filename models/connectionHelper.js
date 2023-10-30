@@ -12,3 +12,4 @@ class ConnectionString {
 }
 
 module.exports = ConnectionString;
+ 

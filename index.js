@@ -106,16 +106,23 @@ app.post("/api/notes", (request, response) => {
 
   const note = new Note({
     content: body.content,
-    important: body.important || false,
+    important: body.important || false
   });
+  console.log(note);
 
   Note.find({content: body.content}).then(foundNote => {
-    if(foundNote){
-      console.log("updated note");
+    console.log('found: ' + foundNote);
+    if(foundNote != ''){
+      Note.updateOne({ id: body.id }, { content: body.content }).then(
+        () => {
+          console.log("note updated");
+          response.json(note);
+        }
+      ); 
     }
     else{
 
-      note.save().then((savedNote) => {
+      note.save().then(() => {
         response.json(note);
         console.log("saved note");
       });
