@@ -1,48 +1,17 @@
 const express = require("express");
-const morgan = require("morgan");
 const app = express();
 const cors = require("cors");
-const mongoose = require("mongoose");
-require('dotenv').config();
+require("dotenv").config();
+const Note = require("./models/note");
+const PhoneInfo = require("./models/phoneInfo");
 
+app.use(express.static("dist"));
 app.use(cors());
 
 app.use(express.json());
 
-app.use(express.static("dist"));
-
-morgan.token("req-headers", function (req, res) {
-  return JSON.stringify(req.headers);
-});
-//app.use(morgan(":method :url :status :req-headers"));
-
-function getConnectionString(collection) {
-  const password = process.env.DB_PASSWORD;
-  let url = `mongodb+srv://fullstack:${password}@cluster0.azl3hya.mongodb.net/${collection}?retryWrites=true&w=majority`;
-  console.log(url);
-  return url;
-}
-
-const notesSchema = new mongoose.Schema({
-  content: String,
-  boolean: Boolean,
-});
-const notesDBConnection = mongoose.createConnection(getConnectionString("noteApp"));
-const Notes = notesDBConnection.model("Notes", notesSchema);
-
-const phoneSchema = new mongoose.Schema({
-  name: String,
-  phone: String,
-});
-const phoneDBDonnection = mongoose.createConnection(getConnectionString("phoneApp"));
-const PhoneInfo = phoneDBDonnection.model("PhoneInfo", phoneSchema);
-
-app.get("/", (req, res) => {
-  res.send("<h1>Hello World again and again!</h1>");
-});
-
 app.get("/api/notes", (req, res) => {
-  Notes.find({}).then((result) => {
+  Note.find({}).then((result) => {
     res.json(result);
   });
 });
@@ -50,60 +19,81 @@ app.get("/api/notes", (req, res) => {
 app.get("/api/persons", (req, res) => {
   PhoneInfo.find({}).then((result) => {
     res.json(result);
-    mongoose.connection.close();
   });
 });
 
-app.get("/api/persons/:id", (req, res) => {
-  let foundPhone = phoneInfos.find((item) => item.id === req.params.id);
-  if (foundPhone) res.json(foundPhone);
-  else return res.status(400).json({ error: "not found" });
+app.get("/api/persons/:id", (req, res, next) => {
+  PhoneInfo.findById(req.params.id)
+    .then((foundPhone) => {
+      if (foundPhone) {
+        res.json(foundPhone);
+      } else return res.status(400).json({ error: "not found" });
+    })
+    .catch((error) => next(error));
 });
 
 app.post("/api/phones", (req, res) => {
   const body = req.body;
-  const phoneInfo = {
-    name: body.name,
-    phone: body.phone,
-  };
   if (!body.name || !body.phone) {
     return res.status(400).json({ error: "name or phone not found" });
   }
-  if (phoneInfos.find((item) => item.phone === body.phone)) {
-    return res.status(400).json({ error: "duplicate phone number" });
-  }
-  phones = phoneInfos.concat(phoneInfo);
-  res.json(phoneInfo);
+
+  PhoneInfo.find({ name: body.name }).then((previousPhone) => {
+    let phoneInfo = new PhoneInfo({
+      name: body.name, // name can not be changed
+      phone: body.phone, // phone number comes as parameter
+    });
+
+    if (previousPhone) {
+      PhoneInfo.updateOne({ name: body.name }, { phone: body.phone }).then(
+        (result) => {
+          console.log("phone updated");
+          res.json(phoneInfo);
+        }
+      );
+    } else {
+      phoneInfo.save().then((result) => {
+        console.log("phone saved");
+        res.json(phoneInfo);
+      });
+    }
+  });
 });
 
-app.delete("/api/persons/:id", (req, res) => {
-  let foundPhone = phoneInfos.find((item) => item.id === req.params.id);
-  if (foundPhone) {
-    console.log("found");
-    res.json({ message: "deleting item" });
-  } else {
-    console.log("not found");
-    return res.status(400).json({ error: "not found" });
-  }
+app.delete("/api/persons/:id", (req, res, next) => {
+  PhoneInfo.findByIdAndRemove(req.params.id)
+    .then((foundPhone) => {
+      res.status(204).end();
+    })
+    .catch((error) => next(error));
+});
+
+app.delete("/api/notes/:id", (req, res, next) => {
+  Note.findByIdAndRemove(req.params.id)
+    .then((result) => {
+      res.status(204).end();
+    })
+    .catch((error) => next(error));
 });
 
 app.get("/api/info", (req, res) => {
   let date = new Date();
-  res.send(
-    "<p>Phonebook has info for " + phoneInfos.length + " people</p>" + date
-  );
+  PhoneInfo.countDocuments({}).then((count) => {
+    res.send("<p>Phonebook has info for " + count + " people</p>" + date);
+  });
 });
 
-app.get("/api/notes/:id", (request, response) => {
-  const id = Number(request.params.id);
-  const note = notes.find((note) => note.id === id);
-  response.json(note);
+app.get("/api/notes/:id", (request, response, next) => {
+  Note.findById(request.params.id)
+    .then((note) => {
+      if (note) {
+        response.json(note);
+      } else {
+        res.status(400).end();
+      }
+    })
+    .catch((error) => next(error));
 });
-
-const generateId = () => {
-  const maxId = notes.length > 0 ? Math.max(...notes.map((n) => n.id)) : 0;
-  return maxId + 1;
-};
 
 app.post("/api/notes", (request, response) => {
   const body = request.body;
@@ -114,17 +104,37 @@ app.post("/api/notes", (request, response) => {
     });
   }
 
-  const note = {
+  const note = new Note({
     content: body.content,
     important: body.important || false,
-    id: generateId(),
-  };
+  });
 
-  notes = notes.concat(note);
+  Note.find({content: body.content}).then(foundNote => {
+    if(foundNote){
+      console.log("updated note");
+    }
+    else{
 
-  response.json(note);
+      note.save().then((savedNote) => {
+        response.json(note);
+        console.log("saved note");
+      });
+    }
+  })
+
 });
 
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message);
+
+  if (error.name === "CastError") {
+    return response.status(400).send({ error: "malformatted id" });
+  }
+
+  next(error);
+};
+
+app.use(errorHandler);
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

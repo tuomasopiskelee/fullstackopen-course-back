@@ -2,6 +2,7 @@ POST http://localhost:3001/api/notes
 Content-Type: application/json
 
 {
+    "id": "1",
     "content": "rest client",
     "important": true
 }
